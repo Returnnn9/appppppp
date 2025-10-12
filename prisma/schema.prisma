@@ -1,0 +1,127 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "windows", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  tg_id          BigInt   @unique
+  username       String?
+  avatar_url     String?
+  stars          Int      @default(0)
+  bought_gifts   Int      @default(0)
+  sold_gifts     Int      @default(0)
+  referred_users Int      @default(0)
+  referral_code  String?
+  registered_at  DateTime @default(now())
+  is_blocked     Boolean  @default(false)
+  block_reason   String?
+  purchases      Purchase[]
+  collection     UserGift[]
+  liveFeeds      LiveFeed[]
+  leaderboardStats LeaderboardStat[]
+}
+
+model Gift {
+  id                Int        @id @default(autoincrement())
+  name              String
+  description       String?
+  price             Int
+  total_quantity    Int
+  available_quantity Int
+  sticker_url       String?
+  status            String     @default("not_unique")
+  frame_type        String     @default("default")
+  ribbon_text       String?
+  ribbon_color      String?
+  is_active         Boolean    @default(true)
+  is_limited        Boolean    @default(false)
+  limited_until     DateTime?
+  purchases         Purchase[]
+  user_gifts        UserGift[]
+  liveFeeds         LiveFeed[]
+}
+
+model Purchase {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  gift_id      Int
+  amount       Int      @default(1)
+  stars_spent  Int
+  purchased_at DateTime @default(now())
+  user         User     @relation(fields: [user_id], references: [id])
+  gift         Gift     @relation(fields: [gift_id], references: [id])
+}
+
+model UserGift {
+  id      Int   @id @default(autoincrement())
+  user_id Int
+  gift_id Int
+  amount  Int   @default(1)
+  is_worn Boolean @default(false)
+  user    User  @relation(fields: [user_id], references: [id])
+  gift    Gift  @relation(fields: [gift_id], references: [id])
+}
+
+model Banner {
+  id         Int      @id @default(autoincrement())
+  image_url  String
+  link       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+}
+
+model LiveFeed {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  gift_id     Int
+  username    String?
+  gift_name   String?
+  sticker_url String?
+  created_at  DateTime @default(now())
+  user        User     @relation(fields: [user_id], references: [id])
+  gift        Gift     @relation(fields: [gift_id], references: [id])
+}
+
+model LeaderboardStat {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  stars_spent Int      @default(0)
+  gifts_bought Int     @default(0)
+  period      String   @default("all_time")
+  week_start  DateTime?
+  week_end    DateTime?
+  user        User     @relation(fields: [user_id], references: [id])
+}
+
+model NewsPost {
+  id          Int      @id @default(autoincrement())
+  image_url   String?
+  text        String
+  button_text String?
+  button_url  String?
+  created_at  DateTime @default(now())
+  is_active   Boolean  @default(true)
+}
+
+model AdminActionLog {
+  id        Int      @id @default(autoincrement())
+  admin_id  Int
+  action    String
+  details   String?
+  created_at DateTime @default(now())
+}
+
+model Backup {
+  id         Int      @id @default(autoincrement())
+  backup_time DateTime @default(now())
+  file_path  String
+  status     String   @default("success")
+}
