@@ -1,8 +1,8 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
   const [username, setUsername] = useState("");
@@ -75,4 +75,13 @@ export default function LoginPage() {
       </div>
     </div>
   );
-} 
+}
+
+export default function LoginPage() {
+  // Wrap our component that uses useSearchParams in Suspense for Next.js 13+ support.
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
