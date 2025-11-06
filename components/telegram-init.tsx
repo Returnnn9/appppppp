@@ -24,6 +24,16 @@ export default function TelegramInit() {
       if (tg.disableVerticalSwipes) {
         tg.disableVerticalSwipes();
       }
+
+      // Отправляем данные пользователя на бэкенд для апсерта (аватар/имя)
+      const u = tg.initDataUnsafe?.user;
+      if (u?.id) {
+        fetch('/api/auth/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: u.id, username: u.username || null, photo_url: u.photo_url || null })
+        }).catch(() => {})
+      }
     } catch {}
   }, [resolvedTheme]);
 

@@ -6,6 +6,9 @@ import { useTheme } from "next-themes";
 
 export default function MyCollection() {
   const [username, setUsername] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [bought, setBought] = useState<number>(0);
+  const [sold, setSold] = useState<number>(0);
 
   // gifts, isEmpty, theming
   const gifts: any[] = [];
@@ -23,15 +26,31 @@ export default function MyCollection() {
   const bgColor = dark ? "bg-black" : "bg-[#f7f7fa]";
 
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
-      const tg = (window as any).Telegram.WebApp;
-      tg.ready();
-      const user = tg.initDataUnsafe?.user;
-      if (user?.username) {
-        setUsername(user.username);
-      } else if (user?.first_name) {
-        setUsername(user.first_name);
-      }
+    if (typeof window === "undefined") return;
+    const tg = (window as any).Telegram?.WebApp;
+    if (!tg) return;
+    tg.ready();
+    const user = tg.initDataUnsafe?.user;
+    if (user?.username) setUsername(user.username);
+    else if (user?.first_name) setUsername(user.first_name);
+    if (user?.photo_url) setAvatarUrl(user.photo_url);
+
+    if (user?.id) {
+      fetch('/api/me', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: user.id })
+      })
+      .then(r => r.json())
+      .then((data) => {
+        if (data?.user) {
+          if (data.user.username) setUsername(data.user.username);
+          if (data.user.avatar_url) setAvatarUrl(data.user.avatar_url);
+          if (typeof data.user.bought_gifts === 'number') setBought(data.user.bought_gifts);
+          if (typeof data.user.sold_gifts === 'number') setSold(data.user.sold_gifts);
+        }
+      })
+      .catch(()=>{})
     }
   }, []);
 
@@ -39,46 +58,32 @@ export default function MyCollection() {
     <div className={`min-h-screen flex flex-col justify-between ${bgColor}`}>
       <div className="flex flex-col items-center justify-center flex-1 mt-8">
         {/* Блок профиля */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 overflow-hidden mb-2 rounded-full border-2 border-[#b6acf3] shadow-md">
+        <div className="flex flex-col items-center mb-8 w-full px-4">
+          <div className="w-[84px] h-[84px] overflow-hidden mb-2 rounded-xl border border-white/10 shadow-[0_4px_24px_rgba(59,130,246,0.25)]">
             <img
-              src="/images/telegram_icons/avatars.png"
+              src={avatarUrl || "/images/telegram_icons/avatars.png"}
               alt={username || ""}
               className="w-full h-full object-cover"
               draggable={false}
             />
           </div>
-          <div
-            className={`text-xl font-bold mb-2 px-2 py-1 text-center ${primaryText}`}
-          >
+          <div className={`text-[22px] font-bold mb-3 px-3 py-1 text-center ${primaryText}`}>
             {username ? `@${username}` : "Loading..."}
           </div>
-          <div className="flex flex-row justify-center gap-12 w-full mb-2 py-2 ">
-            <div className="flex flex-col items-center">
-              <div className="flex items-center">
-                <span className={`text-xl font-bold ${primaryText}`}>0</span>
-                <img
-                  src="/images/telegram_icons/1gifts.svg"
-                  alt="bought"
-                  className="w-4 h-6 ml-1"
-                />
+          <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
+            <div className="rounded-2xl px-4 py-3 bg-[rgba(59,130,246,0.12)] border border-[rgba(59,130,246,0.35)] text-center">
+              <div className="flex items-center justify-center">
+                <span className={`text-xl font-extrabold ${primaryText}`}>{bought}</span>
+                <img src="/images/telegram_icons/1gifts.svg" alt="bought" className="w-4 h-6 ml-1" />
               </div>
-              <span className={`text-base font-semibold mt-1 ${secondaryText}`}>
-                bought
-              </span>
+              <span className={`text-sm font-semibold mt-1 block ${secondaryText}`}>bought</span>
             </div>
-            <div className="flex flex-col items-center">
-              <div className="flex items-center">
-                <span className={`text-xl font-bold ${primaryText}`}>0</span>
-                <img
-                  src="/images/telegram_icons/1gifts.svg"
-                  alt="sold"
-                  className="w-4 h-6 ml-1"
-                />
+            <div className="rounded-2xl px-4 py-3 bg-[rgba(147,51,234,0.12)] border border-[rgba(147,51,234,0.35)] text-center">
+              <div className="flex items-center justify-center">
+                <span className={`text-xl font-extrabold ${primaryText}`}>{sold}</span>
+                <img src="/images/telegram_icons/1gifts.svg" alt="sold" className="w-4 h-6 ml-1" />
               </div>
-              <span className={`text-base font-semibold mt-1 ${secondaryText}`}>
-                sold
-              </span>
+              <span className={`text-sm font-semibold mt-1 block ${secondaryText}`}>sold</span>
             </div>
           </div>
         </div>

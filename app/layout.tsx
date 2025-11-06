@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider';
 import TelegramInit from '@/components/telegram-init';
+import PageTransition from '@/components/page-transition';
 
 export const metadata: Metadata = {
   title: 'v0 App',
@@ -21,7 +22,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
+          <PageTransition>
+            {children}
+          </PageTransition>
           <Analytics />
           <TelegramInit />
         </ThemeProvider>
