@@ -443,9 +443,7 @@ export default function LimitedGiftsPage() {
       </div>
       <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-      <div className="fixed bottom-0 left-0 right-0 z-10">
-        <Navigation />
-      </div>
+      <Navigation />
     </>
   );
 }

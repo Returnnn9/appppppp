@@ -106,6 +106,7 @@ export default function AdminGiftsPage() {
     { label: "Torch", value: "/images/torch.gif" },
   ];
   const [newGiftSticker, setNewGiftSticker] = useState<string>(gifOptions[0]?.value || "");
+  const [stickerFile, setStickerFile] = useState<File | null>(null);
 
   async function loadGifts() {
     try {
@@ -472,6 +473,27 @@ export default function AdminGiftsPage() {
                 ))}
               </select>
               <img src={newGiftSticker} alt="preview" className="w-10 h-10 rounded-lg object-contain bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-gray-700" />
+              <input
+                type="file"
+                accept="image/gif"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0] || null
+                  setStickerFile(f)
+                  if (!f) return
+                  const fd = new FormData()
+                  fd.append('file', f)
+                  const res = await fetch('/api/admin/gifts/upload', { method: 'POST', body: fd })
+                  const data = await res.json()
+                  if (res.ok && data?.url) {
+                    setNewGiftSticker(data.url)
+                    alert('GIF загружен')
+                  } else {
+                    alert(data?.error || 'Не удалось загрузить GIF')
+                  }
+                }}
+                className="text-sm"
+                title="Загрузить свой GIF"
+              />
             </div>
 
             <button
@@ -1087,6 +1109,28 @@ export default function AdminGiftsPage() {
                 {/* Edit Form Fields */}
                 {editingId === gift.id && (
                   <div className="space-y-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">GIF</span>
+                      <input
+                        type="file"
+                        accept="image/gif"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          const fd = new FormData()
+                          fd.append('file', f)
+                          const res = await fetch('/api/admin/gifts/upload', { method: 'POST', body: fd })
+                          const data = await res.json()
+                          if (res.ok && data?.url) {
+                            updateEditField('sticker_url', data.url)
+                            alert('GIF обновлен')
+                          } else {
+                            alert(data?.error || 'Ошибка загрузки GIF')
+                          }
+                        }}
+                        className="text-sm"
+                      />
+                    </div>
                     <input
                       value={editForm.ribbon_text || ""}
                       onChange={(e) => updateEditField("ribbon_text", e.target.value)}

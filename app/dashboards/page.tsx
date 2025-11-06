@@ -5,71 +5,21 @@ import Image from "next/image";
 import { Navigation } from "../../components/navigation";
 import { useTheme } from "next-themes"; // Добавляем для темной темы
 
-// Данные пользователей
-const users = [
-  {
-    id: 1,
-    name: "bnasrtnb",
-    avatar: null, 
-    points: 3224,
-    gifts: 33,
-    isCurrent: false,
-    color: "gold-gradient",
-    initials: "BN",
-  },
-  {
-    id: 2,
-    name: "djasrtnb",
-    avatar: null,
-    points: 3000,
-    gifts: 23,
-    isCurrent: false,
-    color: "bg-blue-400",
-    initials: "DJ",
-  },
-  {
-    id: 3,
-    name: "tsdfk_87",
-    avatar: "/images/avatars/tsdfk_87.jpg",
-    points: 2870,
-    gifts: 21,
-    isCurrent: false,
-    color: "",
-    initials: "",
-  },
-  {
-    id: 4,
-    name: "face3jfcvk",
-    avatar: "/images/avatars/face3jfcvk.jpg",
-    points: 2698,
-    gifts: 19,
-    isCurrent: false,
-    color: "",
-    initials: "",
-  },
-  {
-    id: 5,
-    name: "Dugfmnsd",
-    avatar: null,
-    points: 2540,
-    gifts: 18,
-    isCurrent: false,
-    color: "bg-blue-300",
-    initials: "DG",
-  },
-];
+// Тип для записи лидера
+type Leader = { id: number; name: string; avatar: string | null; points: number; gifts: number; color?: string; initials?: string }
+let users: Leader[] = []
 
-// Текущий пользователь
-const currentUser = {
+// Значения по умолчанию для текущего пользователя
+const defaultCurrentUser = {
   id: 6,
-  name: "j_belfort69",
-  avatar: null,
-  points: 67,
-  gifts: 1,
-  place: 1290,
+  name: "you",
+  avatar: null as string | null,
+  points: 0,
+  gifts: 0,
+  place: 0,
   isCurrent: true,
   color: "bg-teal-400",
-  initials: "JB",
+  initials: "YO",
 };
 
 // Новый объединённый и увеличенный компонент табов
@@ -266,7 +216,7 @@ function UserRow({
       </div>
       <div className={`text-base font-semibold ml-2 flex-shrink-0 ${textNumber}`}>
         {highlight ? (
-          <span className="font-normal">№{currentUser.place}</span>
+          <span className="font-normal">№{place || 0}</span>
         ) : (
           <span>#{place}</span>
         )}
@@ -279,6 +229,36 @@ export default function DashboardsPage() {
   const [activeTab, setActiveTab] = React.useState<"week" | "all">("week");
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
+  const [me, setMe] = React.useState(defaultCurrentUser)
+  const [leaders, setLeaders] = React.useState<Leader[]>([])
+
+  React.useEffect(() => {
+    const tg = (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) ? (window as any).Telegram.WebApp : null
+    const u = tg?.initDataUnsafe?.user
+    const name = u?.username || u?.first_name || defaultCurrentUser.name
+    const avatar = u?.photo_url || null
+    setMe((prev) => ({ ...prev, name, avatar }))
+    // подгружаем лидерборд
+    const tgId = u?.id ? `&tg_id=${u.id}` : ''
+    fetch(`/api/leaderboard?period=week&limit=100${tgId}`)
+      .then(r => r.json())
+      .then((data) => {
+        if (!data?.ok) return
+        const list: Leader[] = (data.leaderboard || []).map((row: any) => ({
+          id: row.user_id,
+          name: row.username || '—',
+          avatar: row.avatar_url || null,
+          points: row.stars || 0,
+          gifts: row.gifts || 0,
+        }))
+        setLeaders(list)
+        if (data.me) {
+          const displayName = data.me.username || u?.username || u?.first_name || 'you'
+          setMe((prev) => ({ ...prev, name: displayName, avatar: data.me.avatar_url || prev.avatar, points: data.me.stars || 0, gifts: data.me.gifts || 0, place: data.me.place || prev.place }))
+        }
+      })
+      .catch(()=>{})
+  }, [])
   const bgPage = dark ? "bg-black" : "bg-gray-50";
   const bgLeaderboard = dark ? "bg-[#23243a] shadow-none" : "bg-white shadow-sm";
   const textLeaderboardHeader = dark ? "text-gray-200" : "text-black";
@@ -294,7 +274,7 @@ export default function DashboardsPage() {
           {/* Если нужно, можно добавить отображение другого таймера для "all" */}
           <div className={`rounded-2xl px-0 py-2 mb-2 ${bgLeaderboard}`}>
             <div className={`text-base font-bold text-center mb-2 mt-2 ${textLeaderboardHeader}`}>Top 100 leaders</div>
-            {users.map((user, idx) => (
+            {leaders.map((user, idx) => (
               <UserRow
                 key={user.id}
                 user={user}
@@ -305,7 +285,7 @@ export default function DashboardsPage() {
             ))}
           </div>
           <div className="mt-2">
-            <UserRow user={currentUser as typeof users[0]} place={currentUser.place || 0} highlight={true} dark={dark} />
+            <UserRow user={{...me, name: me.name} as any} place={me.place || 0} highlight={true} dark={dark} />
           </div>
         </div>
       </div>

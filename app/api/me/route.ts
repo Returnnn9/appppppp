@@ -7,6 +7,9 @@ export async function POST(req: Request) {
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const tgId = BigInt(id)
 
+    const url = new URL(req.url)
+    const includeStars = url.searchParams.get('stars') === 'true'
+
     const user = await prisma.user.findFirst({
       where: { tg_id: tgId },
       select: {
@@ -14,6 +17,7 @@ export async function POST(req: Request) {
         avatar_url: true,
         bought_gifts: true,
         sold_gifts: true,
+        ...(includeStars ? { stars: true } : {}),
       },
     })
 
