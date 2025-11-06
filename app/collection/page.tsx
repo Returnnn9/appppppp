@@ -111,42 +111,27 @@ export default function MyCollection() {
               </div>
               <button
                 onClick={async () => {
-                  if (!tgId) return
-                  const amount = 100 // можно сделать выбор суммы
+                  if (!tgId) return;
+                  const amount = 100; // можно сделать выбор суммы
                   try {
                     const res = await fetch('/api/payments/topup', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ tg_id: tgId, amount })
-                    })
-                    const data = await res.json()
+                    });
+                    const data = await res.json();
                     if (!res.ok || !data?.ok || !(data?.slug || data?.invoiceLink)) {
-                      alert(data?.error || 'Не удалось создать инвойс')
-                      return
+                      alert(data?.error || 'Не удалось создать инвойс');
+                      return;
                     }
-                    const tg = (window as any).Telegram?.WebApp
-                    if (tg?.openInvoice) {
-                      const slug = data.slug || ''
-                      tg.openInvoice(slug, (status: string) => {
-                        if (status === 'paid') {
-                          alert('Баланс пополнен!')
-                          // Обновляем баланс
-                          fetch(`/api/me?stars=true`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: tgId })
-                          })
-                          .then(r => r.json())
-                          .then((data) => {
-                            if (data?.user?.stars !== undefined) setStars(data.user.stars)
-                          })
-                          .catch(()=>{})
-                        }
-                      })
+                    const tg = (window as any).Telegram?.WebApp;
+                    // Новый обработчик для Stars/Payments через ссылку
+                    if (tg?.openTelegramLink && data.invoiceLink) {
+                      tg.openTelegramLink(data.invoiceLink);
                     } else if (data.invoiceLink) {
-                      window.open(data.invoiceLink, '_blank')
+                      window.open(data.invoiceLink, '_blank');
                     } else {
-                      alert('Платежная система Telegram недоступна.')
+                      alert('Платежная система Telegram недоступна.');
                     }
                   } catch (e) {
                     alert('Ошибка при создании платежа')
