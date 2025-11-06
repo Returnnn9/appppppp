@@ -323,22 +323,12 @@ export function GiftDetail({ gift, onClose }: GiftDetailProps) {
                 // Попытка открыть инвойс через Telegram WebApp
                 // @ts-ignore
                 const tg = (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) ? (window as any).Telegram.WebApp : null
-                if (tg?.openInvoice) {
-                  const slug = data.slug || ''
-                  tg.openInvoice(slug, (status: string) => {
-                    if (status === 'paid') {
-                      alert('Оплата прошла успешно!')
-                      onClose?.()
-                    } else if (status) {
-                      // pending / cancelled / failed
-                      // Можно показать тост, логировать и т.д.
-                    }
-                  })
+                if (tg?.openTelegramLink && data.invoiceLink) {
+                  tg.openTelegramLink(data.invoiceLink);
                 } else if (data.invoiceLink) {
-                  // Fallback: открыть ссылку в новом окне
-                  window.open(data.invoiceLink, '_blank')
+                  window.open(data.invoiceLink, '_blank');
                 } else {
-                  alert('Платежная система Telegram недоступна.')
+                  alert('Платежная система Telegram недоступна.');
                 }
               } catch (e) {
                 alert('Ошибка при создании платежа')
