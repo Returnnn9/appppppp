@@ -1,11 +1,35 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Eye, EyeOff, Gift, Edit3, Save, X, Package, Search, Filter, MoreVertical, ChevronDown, Loader2, Calendar, Ribbon, DollarSign, Hash, Zap, Image as ImageIcon } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  Gift,
+  Edit3,
+  Save,
+  X,
+  Package,
+  Search,
+  Loader2,
+  Calendar,
+  Ribbon,
+  DollarSign,
+  Hash,
+  Zap,
+  Image as ImageIcon,
+  Users,
+  Star,
+  Clock,
+  TrendingUp,
+  FileText,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type Gift = {
   id: number;
   name: string;
+  description?: string | null;
   price: number;
   total_quantity: number;
   available_quantity: number;
@@ -18,6 +42,28 @@ type Gift = {
 };
 
 type ViewMode = "grid" | "list";
+
+type Banner = {
+  id: string;
+  url: string;
+  filename?: string;
+};
+
+type ProjectStats = {
+  days_operating: number;
+  total: {
+    gifts_purchased: number;
+    stars_spent: number;
+    new_users: number;
+  };
+  today: {
+    gifts_purchased: number;
+    stars_spent: number;
+    new_users: number;
+  };
+};
+
+const DEFAULT_DESCRIPTION = "Этот подарок скоро будет доступен для улучшения, продажи или выпуска в виде NFT.";
 
 export default function AdminGiftsPage() {
   const router = useRouter();
@@ -35,20 +81,20 @@ export default function AdminGiftsPage() {
   const [transferForm, setTransferForm] = useState<{ from_tg_id: string; to_tg_id: string; gift_id: number | ""; amount: number }>({ from_tg_id: "", to_tg_id: "", gift_id: "", amount: 1 });
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
-  // Banner state for admin quick replace
   const [bannerReplacing, setBannerReplacing] = useState(false);
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerFiles, setBannerFiles] = useState<File[]>([]);
   const [bannerUploading, setBannerUploading] = useState(false);
-  const [bannerImageUrl, setBannerImageUrl] = useState<string>("");
+  const [banners, setBanners] = useState<Banner[]>([]);
 
-  // Удаляем зеленый (green) цвет из ribbonColors
+  const [projectStats, setProjectStats] = useState<ProjectStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
   const ribbonColors = {
     blue: { name: "Синяя", class: "bg-blue-500" },
     orange: { name: "Оранжевая", class: "bg-orange-500" },
     red: { name: "Красная", class: "bg-red-500" }
   };
 
-  // Доступные GIF (из public/images)
   const gifOptions = [
     { label: "Castle", value: "/images/castle.gif" },
     { label: "Coconut", value: "/images/coconut.gif" },
@@ -61,16 +107,13 @@ export default function AdminGiftsPage() {
   ];
   const [newGiftSticker, setNewGiftSticker] = useState<string>(gifOptions[0]?.value || "");
 
-  // Загрузка данных
   async function loadGifts() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/admin/gifts", { 
+      const res = await fetch("/api/admin/gifts", {
         cache: "no-store",
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
+        headers: { "Cache-Control": "no-cache" },
       });
       if (!res.ok) throw new Error("Не удалось загрузить подарки");
       const data = await res.json();
@@ -83,17 +126,43 @@ export default function AdminGiftsPage() {
     }
   }
 
-  // Получить текущее изображение баннера (если хотите показать предпросмотр)
-  async function fetchBannerUrl() {
+  async function loadProjectStats() {
     try {
-      // Здесь предполагается статический путь или API для получения баннера
-      setBannerImageUrl("/banner/banner.png?ts=" + Date.now());
-    } catch (e) {}
+      setStatsLoading(true);
+      const res = await fetch("/api/admin/stats", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (!res.ok) throw new Error("Не удалось загрузить статистику");
+      const data = await res.json();
+      setProjectStats(data);
+    } catch (e: any) {
+      console.error("Stats load error:", e);
+    } finally {
+      setStatsLoading(false);
+    }
+  }
+
+  async function fetchBanners() {
+    try {
+      const res = await fetch("/api/admin/banners", { cache: "no-store" });
+      if (!res.ok) throw new Error("Не удалось загрузить баннеры");
+      const data: Banner[] = await res.json();
+      setBanners(
+        data.map(b => ({
+          ...b,
+          url: b.url + (b.url.includes("?") ? "&" : "?") + "ts=" + Date.now(),
+        }))
+      );
+    } catch (e) {
+      setBanners([]);
+    }
   }
 
   useEffect(() => {
     loadGifts();
-    fetchBannerUrl();
+    fetchBanners();
+    loadProjectStats();
   }, []);
 
   async function logout() {
@@ -102,17 +171,16 @@ export default function AdminGiftsPage() {
     router.refresh();
   }
 
-  // Фильтрация и поиск
   const filteredGifts = gifts.filter(gift => {
     const matchesSearch = gift.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         gift.ribbon_text?.toLowerCase().includes(searchTerm.toLowerCase());
+                         gift.ribbon_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         gift.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || 
                          (statusFilter === "active" && gift.is_active) ||
                          (statusFilter === "inactive" && !gift.is_active);
     return matchesSearch && matchesStatus;
   });
 
-  // Создание подарка
   async function createGift() {
     setCreating(true);
     try {
@@ -121,6 +189,7 @@ export default function AdminGiftsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: "Новый подарок",
+          description: DEFAULT_DESCRIPTION,
           price: 100,
           total_quantity: 1,
           available_quantity: 1,
@@ -137,25 +206,26 @@ export default function AdminGiftsPage() {
     }
   }
 
-  // Загрузка и замена баннера
   async function handleBannerReplace() {
-    if (!bannerFile) {
-      alert("Выберите файл баннера");
+    if (!bannerFiles || bannerFiles.length === 0) {
+      alert("Выберите файл(ы) баннера");
       return;
     }
     setBannerUploading(true);
     try {
       const formData = new FormData();
-      formData.append("banner", bannerFile);
-      const res = await fetch("/api/admin/banner", {
+      for (const file of bannerFiles) {
+        formData.append("banners", file);
+      }
+      const res = await fetch("/api/admin/banners", {
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error("Ошибка загрузки баннера");
+      if (!res.ok) throw new Error("Ошибка загрузки баннеров");
       setBannerReplacing(false);
-      setBannerFile(null);
-      fetchBannerUrl();
-      alert("Баннер успешно обновлён!");
+      setBannerFiles([]);
+      await fetchBanners();
+      alert("Баннеры успешно добавлены!");
     } catch (e: any) {
       alert(e?.message || "Ошибка обновления баннера");
     } finally {
@@ -163,7 +233,17 @@ export default function AdminGiftsPage() {
     }
   }
 
-  // Редактирование
+  async function deleteBanner(bannerId: string) {
+    if (!confirm("Удалить этот баннер?")) return;
+    try {
+      const res = await fetch(`/api/admin/banners/${bannerId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Ошибка удаления баннера");
+      await fetchBanners();
+    } catch (e: any) {
+      alert(e?.message || "Ошибка удаления баннера");
+    }
+  }
+
   function startEdit(gift: Gift) {
     setEditingId(gift.id);
     setEditForm({ ...gift });
@@ -197,7 +277,6 @@ export default function AdminGiftsPage() {
     setEditForm(prev => ({ ...prev, [field]: value }));
   }
 
-  // Действия
   async function toggleActive(gift: Gift) {
     try {
       const res = await fetch(`/api/admin/gifts/${gift.id}`, {
@@ -286,8 +365,7 @@ export default function AdminGiftsPage() {
     }
   }
 
-  // Статистика
-  const stats = {
+  const giftStats = {
     total: gifts.length,
     active: gifts.filter(g => g.is_active).length,
     inactive: gifts.filter(g => !g.is_active).length,
@@ -295,7 +373,6 @@ export default function AdminGiftsPage() {
     totalValue: gifts.reduce((sum, g) => sum + (g.price * g.available_quantity), 0)
   };
 
-  // Скелетон загрузки
   const SkeletonCard = () => (
     <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 animate-pulse">
       <div className="flex items-start justify-between mb-4">
@@ -316,6 +393,22 @@ export default function AdminGiftsPage() {
           <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded flex-1"></div>
         </div>
       </div>
+    </div>
+  );
+
+  const StatsSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 animate-pulse">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
+            <div className="flex-1">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2"></div>
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 
@@ -367,7 +460,6 @@ export default function AdminGiftsPage() {
               </button>
             </div>
             
-            {/* Выбор GIF для нового подарка */}
             <div className="flex items-center gap-2">
               <select
                 value={newGiftSticker}
@@ -395,14 +487,13 @@ export default function AdminGiftsPage() {
               Новый подарок
             </button>
 
-            {/* Кнопка замены баннера */}
             <button
               onClick={() => setBannerReplacing((v) => !v)}
               className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-black dark:text-gray-900 font-semibold border border-yellow-300 dark:border-yellow-500 shadow transition-all text-sm lg:text-base"
-              title="Заменить баннер"
+              title="Добавить баннеры"
             >
               <ImageIcon className="w-4 h-4 lg:w-5 lg:h-5" />
-              Заменить баннер
+              Баннеры
             </button>
             
             <button
@@ -414,47 +505,247 @@ export default function AdminGiftsPage() {
           </div>
         </div>
 
-        {/* Форма замены баннера */}
+        {/* Project Statistics */}
+        <div className="mb-6 lg:mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <TrendingUp className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl lg:text-2xl font-bold text-foreground">Статистика проекта</h2>
+          </div>
+           
+          {statsLoading ? (
+            <StatsSkeleton />
+          ) : projectStats ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-xl">
+                    <Clock className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Дней работы</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {projectStats.days_operating}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-green-50 dark:bg-green-950 rounded-xl">
+                    <Gift className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Всего подарков</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {projectStats.total.gifts_purchased.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950 rounded-xl">
+                    <Star className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Всего звезд</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {projectStats.total.stars_spent.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-purple-50 dark:bg-purple-950 rounded-xl">
+                    <Users className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Новых пользователей</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {projectStats.total.new_users.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-700 rounded-2xl p-6 text-center">
+              <p className="text-red-700 dark:text-red-300">Не удалось загрузить статистику</p>
+              <button
+                onClick={loadProjectStats}
+                className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+              >
+                Попробовать снова
+              </button>
+            </div>
+          )}
+
+          {projectStats && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium opacity-90">Подарков сегодня</p>
+                    <p className="text-2xl font-bold">{projectStats.today.gifts_purchased.toLocaleString()}</p>
+                  </div>
+                  <Gift className="w-8 h-8 opacity-90" />
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium opacity-90">Звезд сегодня</p>
+                    <p className="text-2xl font-bold">{projectStats.today.stars_spent.toLocaleString()}</p>
+                  </div>
+                  <Star className="w-8 h-8 opacity-90" />
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium opacity-90">Новых пользователей</p>
+                    <p className="text-2xl font-bold">{projectStats.today.new_users.toLocaleString()}</p>
+                  </div>
+                  <Users className="w-8 h-8 opacity-90" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {projectStats?.top_today && (
+            <div className="mt-4 bg-white dark:bg-[#1e293b] rounded-2xl p-4 border border-gray-100 dark:border-gray-800 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex items-center justify-center">
+                {projectStats.top_today.avatar_url ? (
+                  <img src={projectStats.top_today.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-sm text-gray-600 dark:text-gray-300">{(projectStats.top_today.username || '?').slice(0,2).toUpperCase()}</span>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm text-gray-500 dark:text-gray-400">Лучший за сегодня</div>
+                <div className="font-medium text-gray-900 dark:text-gray-100">{projectStats.top_today.username || '—'}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-gray-500 dark:text-gray-400">Звезды</div>
+                <div className="font-semibold text-gray-900 dark:text-gray-100">{projectStats.top_today.stars_spent.toLocaleString()}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Banner Management */}
         {bannerReplacing && (
           <div className="bg-white dark:bg-[#1e293b] rounded-2xl shadow-sm border border-yellow-200 dark:border-yellow-700 p-4 mb-6 flex flex-col gap-4">
             <div className="font-semibold text-lg flex items-center gap-2">
               <ImageIcon className="w-5 h-5 text-yellow-600" />
-              Заменить баннер сайта
+              Управление баннерами сайта
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 items-start">
+            <div className="flex flex-col gap-4">
               <div>
-                <label className="block mb-2 text-sm">Новый баннер (PNG или JPEG)</label>
+                <label className="block mb-2 text-sm">
+                  Добавить баннеры (PNG или JPEG, можно загружать сразу несколько разными очередями)
+                </label>
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/jpg"
-                  onChange={e => setBannerFile(e.target.files?.[0] ?? null)}
+                  multiple
+                  onChange={e => {
+                    if (!e.target.files) {
+                      setBannerFiles([]);
+                      return;
+                    }
+                    const newFiles = Array.from(e.target.files);
+                    setBannerFiles(prev =>
+                      [
+                        ...prev, 
+                        ...newFiles.filter(
+                          nf => !prev.some(pf => pf.name === nf.name && pf.size === nf.size)
+                        )
+                      ]
+                    );
+                    e.target.value = "";
+                  }}
                   className="block"
                 />
+                {bannerFiles && bannerFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mt-2">
+                    {bannerFiles.map((file, i) => (
+                      <div key={file.name + file.size} className="flex items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 relative">
+                        <span className="text-xs max-w-[150px] truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          className="ml-2 text-red-600 hover:text-red-800"
+                          title="Удалить из выбора"
+                          onClick={() => {
+                            setBannerFiles(prev => prev.filter((_, idx) => idx !== i));
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              {bannerImageUrl && (
+
+              {banners.length > 0 && (
                 <div>
-                  <label className="block mb-2 text-sm">Текущий баннер</label>
-                  <img src={bannerImageUrl} alt="Баннер" className="w-48 max-h-32 rounded shadow object-contain border dark:border-gray-700" />
+                  <label className="block mb-2 text-sm">Текущие баннеры</label>
+                  <div className="flex gap-4 flex-wrap">
+                    {banners.map((banner) => (
+                      <div key={banner.id} className="relative">
+                        <img
+                          src={banner.url}
+                          alt="Баннер"
+                          className="w-48 max-h-32 rounded shadow object-contain border dark:border-gray-700"
+                        />
+                        <button
+                          type="button"
+                          className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center z-10"
+                          title="Удалить баннер"
+                          onClick={() => deleteBanner(banner.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-300 mt-2">
+                    Кликните на корзину, чтобы удалить баннер.
+                  </div>
                 </div>
               )}
             </div>
             <div className="flex gap-2">
               <button
-                disabled={!bannerFile || bannerUploading}
+                disabled={!bannerFiles.length || bannerUploading}
                 onClick={handleBannerReplace}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-400 hover:bg-yellow-500 text-black dark:text-gray-900 font-bold disabled:opacity-50 transition-all"
               >
                 {bannerUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                Обновить баннер
+                Добавить выбранные баннеры
               </button>
               <button
-                onClick={() => { setBannerReplacing(false); setBannerFile(null); }}
+                onClick={() => {
+                  setBannerReplacing(false);
+                  setBannerFiles([]);
+                }}
                 className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-200 font-medium transition-all"
               >
                 Отмена
               </button>
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-300">Файл заменит текущий баннер сайта. Рекомендуемый размер: 1200x300.</div>
+            <div className="text-xs text-gray-500 dark:text-gray-300">
+              Загрузите файлы для добавления новых баннеров. Рекомендуемый размер: 1200x300.<br />
+              Вы можете выбрать сразу несколько файлов и удалить ненужные из списка до отправки.<br />
+              Также можно удалять существующие баннеры.
+            </div>
           </div>
         )}
 
@@ -465,7 +756,7 @@ export default function AdminGiftsPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Поиск по названию или тексту ленты..."
+                placeholder="Поиск по названию, описанию или тексту ленты..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50/50 dark:bg-[#1e293b] transition-all text-gray-900 dark:text-gray-100"
@@ -485,7 +776,7 @@ export default function AdminGiftsPage() {
             </div>
           </div>
 
-          {/* Admin actions: grant and transfer */}
+          {/* Admin actions */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
             <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-[#1e293b]">
               <div className="font-semibold mb-3">Выдать подарок пользователю</div>
@@ -524,7 +815,7 @@ export default function AdminGiftsPage() {
               </div>
               <div>
                 <p className="text-xs lg:text-sm font-medium text-muted-foreground">Всего</p>
-                <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
+                <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{giftStats.total}</p>
               </div>
             </div>
           </div>
@@ -536,7 +827,7 @@ export default function AdminGiftsPage() {
               </div>
               <div>
                 <p className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400">Активных</p>
-                <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.active}</p>
+                <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{giftStats.active}</p>
               </div>
             </div>
           </div>
@@ -548,7 +839,7 @@ export default function AdminGiftsPage() {
               </div>
               <div>
                 <p className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400">Скрытых</p>
-                <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.inactive}</p>
+                <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{giftStats.inactive}</p>
               </div>
             </div>
           </div>
@@ -560,7 +851,7 @@ export default function AdminGiftsPage() {
               </div>
               <div>
                 <p className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400">Доступно</p>
-                <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.available}</p>
+                <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{giftStats.available}</p>
               </div>
             </div>
           </div>
@@ -573,7 +864,7 @@ export default function AdminGiftsPage() {
               <div>
                 <p className="text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-400">Общая стоимость</p>
                 <p className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {stats.totalValue.toLocaleString()} звезд
+                  {giftStats.totalValue.toLocaleString()} звезд
                 </p>
               </div>
             </div>
@@ -674,6 +965,36 @@ export default function AdminGiftsPage() {
                     {gift.is_active ? 'Активен' : 'Скрыт'}
                   </div>
                 </div>
+
+                {/* Description */}
+                {(editingId === gift.id || gift.description) && (
+                  <div className="mb-4">
+                    {editingId === gift.id ? (
+                      <>
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Описание</label>
+                        </div>
+                        <textarea
+                          value={editForm.description || ""}
+                          onChange={(e) => updateEditField("description", e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white dark:bg-[#1e293b] text-gray-900 dark:text-gray-100 resize-none"
+                          placeholder="Описание подарка (отображается в деталях)"
+                          rows={3}
+                        />
+                      </>
+                    ) : (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                            {gift.description || DEFAULT_DESCRIPTION}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Price */}
                 <div className="mb-4">
@@ -848,7 +1169,7 @@ export default function AdminGiftsPage() {
           </div>
         )}
 
-        {/* Gifts List View */}
+        {/* List View */}
         {!loading && !error && filteredGifts.length > 0 && viewMode === "list" && (
           <div className="bg-white dark:bg-[#1e293b] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
@@ -889,6 +1210,11 @@ export default function AdminGiftsPage() {
                           <div>
                             <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">{gift.name}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">ID: #{gift.id}</p>
+                            {gift.description && (
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 max-w-xs truncate" title={gift.description}>
+                                {gift.description}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -969,4 +1295,5 @@ export default function AdminGiftsPage() {
       </div>
     </div>
   );
+
 }

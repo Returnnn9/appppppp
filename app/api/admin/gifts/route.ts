@@ -11,9 +11,7 @@ export async function GET() {
     const gifts = await prisma.gift.findMany({ orderBy: { id: 'asc' } })
     return NextResponse.json(gifts)
   } catch (e) {
-    // Log the error for debugging
     console.error('Ошибка при получении подарков:', e)
-    // Return the error message expected by the frontend
     return NextResponse.json({ error: 'Не удалось загрузить подарки' }, { status: 500 })
   }
 }
@@ -40,8 +38,8 @@ export async function POST(req: Request) {
 
     const created = await prisma.gift.create({
       data: {
-        name: body.name ?? 'New Gift',
-        description: body.description ?? null,
+        name: body.name ?? 'Новый подарок',
+        description: body.description ?? 'Этот подарок скоро будет доступен для улучшения, продажи или выпуска в виде NFT.',
         price: Number(body.price ?? 0),
         total_quantity: Number(body.total_quantity ?? 0),
         available_quantity: Number(body.available_quantity ?? 0),
@@ -57,7 +55,6 @@ export async function POST(req: Request) {
     })
     return NextResponse.json(created, { status: 201 })
   } catch (e) {
-    // Log the error for debugging
     console.error('Ошибка при создании подарка:', e)
     return NextResponse.json({ error: 'Не удалось создать подарок' }, { status: 500 })
   }

@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider';
+import TelegramInit from '@/components/telegram-init';
 
 export const metadata: Metadata = {
   title: 'v0 App',
@@ -22,6 +23,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
           <Analytics />
+          <TelegramInit />
         </ThemeProvider>
       </body>
     </html>

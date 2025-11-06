@@ -23,7 +23,7 @@ export default function MarketPage() {
         </div>
         <div className="flex flex-col items-center px-8 py-4 text-center">
           <div
-            className={`text-[40px] leading-[44px] font-bold mb-2 ${isDark ? "text-white" : "text-black"}`}
+            className={`text-[40px] leading-[34px] font-normal mb-2 ${isDark ? "text-white" : "text-black"}`}
             style={{ lineHeight: "44px" }}
           >
             Market
